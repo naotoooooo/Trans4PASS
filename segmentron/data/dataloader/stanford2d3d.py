@@ -23,10 +23,10 @@ class Stanford2d3dSegmentation(SegmentationDataset):
     NUM_CLASS = 13
     fold = 1
 
-    def __init__(self, root='datasets/Stanford2D3D', split='train', mode=None, transform=None, **kwargs):
+    def __init__(self, root='datasets/dkan_8noji_raw_2025-06-19-08-57-44', split='train', mode=None, transform=None, **kwargs):
         super(Stanford2d3dSegmentation, self).__init__(root, split, mode, transform, **kwargs)
         root = os.path.join(self.root, self.BASE_DIR)
-        assert os.path.exists(root), "Please put the data in {SEG_ROOT}/datasets/"
+        assert os.path.exists(root), "Please put the data in {SEG_ROOT}datasets/dkan_8noji_raw_2025-06-19-08-57-44"
         self.images, self.masks = _get_stanford2d3d_pairs(root, self.fold, split)
         assert (len(self.images) == len(self.masks))
         if len(self.images) == 0:
@@ -97,7 +97,7 @@ def _get_stanford2d3d_pairs(folder, fold, mode='train'):
     else:
         raise NotImplementedError
     for a in area_ids:
-        img_paths += glob.glob(os.path.join(folder, '{}/data/rgb/*_rgb.png'.format(a)))
+        img_paths += glob.glob(os.path.join(folder, 'rgb/val/*.png'))
     img_paths = sorted(img_paths)
     mask_paths = [imgpath.replace('rgb', 'semantic') for imgpath in img_paths]
     return img_paths, mask_paths

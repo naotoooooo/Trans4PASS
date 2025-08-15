@@ -27,11 +27,12 @@ class Stanford2d3dPanSegmentation(SegmentationDataset):
     NUM_CLASS = 13
     fold = 1
 
-    def __init__(self, root='datasets/Stanford2D3D', split='train', mode=None, transform=None, **kwargs):
+    def __init__(self, root='datasets/dkan_8noji_raw_2025-06-19-08-57-44', split='val', mode=None, transform=None, **kwargs):
         super(Stanford2d3dPanSegmentation, self).__init__(root, split, mode, transform, **kwargs)
-        assert os.path.exists(root), "Please put the data in {SEG_ROOT}/datasets/"
+        assert os.path.exists(root), "Please put the data in {SEG_ROOT}datasets/dkan_8noji_raw_2025-06-19-08-57-44"
         self.images, self.masks = _get_stanford2d3d_pairs(root, self.fold, split)
-        self.crop_size = [2048, 1024]  # for inference only
+        # self.crop_size = [2048, 1024]  # for inference only
+        self.crop_size = [1280,331]  # for inference only
         assert (len(self.images) == len(self.masks))
         if len(self.images) == 0:
             raise RuntimeError("Found 0 images in {}".format(os.path.join(root, split)))
@@ -62,6 +63,7 @@ class Stanford2d3dPanSegmentation(SegmentationDataset):
             if self.transform is not None:
                 img = self.transform(img)
             return img, os.path.basename(self.images[index])
+        print(self.masks[index])
         mask = Image.open(self.masks[index])
         mask = _color2id(mask, img, self.id2label)
         if self.mode == 'train':
@@ -104,16 +106,30 @@ def _get_stanford2d3d_pairs(folder, fold, mode='train'):
     else:
         raise NotImplementedError
     for a in area_ids:
-        img_paths += glob.glob(os.path.join(folder, '{}/pano/rgb/*_rgb.png'.format(a)))
+        img_paths += glob.glob(os.path.join(folder, 'rgb/val/*.png'))
     img_paths = sorted(img_paths)
-    mask_paths = [imgpath.replace('rgb', 'semantic') for imgpath in img_paths]
+    mask_paths = [imgpath.replace('rgb', 'depth') for imgpath in img_paths]
     return img_paths, mask_paths
-
+    # return img_paths
+    
+    
+    
 def _color2id(mask, img, id2label):
     mask = np.array(mask, np.int32)
     rgb = np.array(img, np.int32)
     unk = (mask[..., 0] != 0)
-    mask = id2label[mask[..., 1] * 256 + mask[..., 2]]
+    
+      # インデックス計算
+    index = mask[..., 1] * 256 + mask[..., 2]
+    
+     # 範囲外のインデックスを修正
+    if np.max(index) >= len(id2label):
+        print(f"Warning: Index out of bounds. Max index: {np.max(index)}, id2label size: {len(id2label)}")
+        index = np.clip(index, 0, len(id2label) - 1)
+    
+    
+    mask = id2label[index]    
+    # mask = id2label[mask[..., 1] * 256 + mask[..., 2]]
     mask[unk] = 0
     mask[rgb.sum(-1) == 0] = 0
     mask -= 1  # 0->255
@@ -128,7 +144,7 @@ if __name__ == '__main__':
      # Transforms for Normalization
     input_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((.485, .456, .406), (.229, .224, .225)),])
      # Create Dataset
-    trainset = Stanford2d3dPanSegmentation(split='train', transform=input_transform)
+    trainset = Stanford2d3dPanSegmentation(split='val', transform=input_transform)
      # Create Training Loader
     train_data = data.DataLoader(trainset, 4, shuffle=True, num_workers=0)
     for i, data in enumerate(train_data):

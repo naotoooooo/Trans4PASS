@@ -23,10 +23,10 @@ class Stanford2d3d8Segmentation(SegmentationDataset):
     NUM_CLASS = 8
     fold = 1
 
-    def __init__(self, root='datasets/Stanford2D3D', split='train', mode=None, transform=None, **kwargs):
+    def __init__(self, root='datasets/meiji_outdoor_8noji_raw_2025-06-26-07-11-41', split='val', mode=None, transform=None, **kwargs):
         super(Stanford2d3d8Segmentation, self).__init__(root, split, mode, transform, **kwargs)
         root = os.path.join(self.root, self.BASE_DIR)
-        assert os.path.exists(root), "Please put the data in {SEG_ROOT}/datasets/"
+        assert os.path.exists(root), "Please put the data in {SEG_ROOT}/datasets/meiji_outdoor_8noji_raw_2025-06-26-07-11-41"
         self.images, self.masks = _get_stanford2d3d_pairs(root, self.fold, split)
         assert (len(self.images) == len(self.masks))
         if len(self.images) == 0:

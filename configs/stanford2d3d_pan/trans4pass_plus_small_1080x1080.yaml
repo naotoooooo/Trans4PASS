@@ -13,9 +13,9 @@ TRAIN:
     APEX: False
 TEST:
     BATCH_SIZE: 1
-    TEST_MODEL_PATH: "workdirs/stanford2d3d_pan/trans4pass_plus_small_1080x1080/trans4pass_plus_small_pan_F1.pth"
+    # TEST_MODEL_PATH: "workdirs/stanford2d3d_pan/trans4pass_plus_small_1080x1080/trans4pass_plus_small_pan_F1.pth"
     # TEST_MODEL_PATH: "workdirs/stanford2d3d_pan/trans4pass_plus_small_1080x1080/trans4pass_plus_small_pan_F2.pth"
-    # TEST_MODEL_PATH: "workdirs/stanford2d3d_pan/trans4pass_plus_small_1080x1080/trans4pass_plus_small_pan_F3.pth"
+    TEST_MODEL_PATH: "workdirs/stanford2d3d_pan/trans4pass_plus_small_1080x1080/trans4pass_plus_small_pan_F3.pth"
     CROP_SIZE: (2048,1024)
 
 SOLVER:

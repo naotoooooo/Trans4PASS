@@ -24,12 +24,68 @@ from segmentron.config import cfg
 from segmentron.utils.options import parse_args
 from segmentron.utils.default_setup import default_setup
 
+###############
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import ListedColormap,LinearSegmentedColormap
+import time
+
+
+
+# #カラーマップの定義（Cityscapesのようなデータセットの場合）
+# Sfcolor = np.array([
+#     [255, 0, 0],  # beam
+#     [255, 128, 0],  # board
+#     [255, 192, 0],    # bookcase
+#     [192, 255, 0], # ceiling
+#     [128, 255, 0], # chair
+#     [0, 255, 0], # clutter
+#     [0, 255, 192],  # column
+#     [0, 192, 255],   # door
+#     [0, 128, 255],  # floor
+#     [0, 0, 255], # sofa
+#     [128, 0, 255],  # table
+#     [192, 0, 255],   # wall
+#     [255, 0, 255],     # window
+# ],dtype=float)
+# Sfcolor[:,:3]/=256 #RGBを0-1の範囲に変換
+# Sfcmap=ListedColormap(Sfcolor)
+
+#カラーマップの定義（Cityscapesのようなデータセットの場合）
+Sfcolor = np.array([
+    [192, 255, 0], # ceiling
+    [128, 255, 0], # chair
+    [0, 192, 255],   # door
+    [0, 128, 255],  # floor
+    [0, 0, 255], # sofa
+    [128, 0, 255],  # table
+    [192, 0, 255],   # wall
+    [255, 0, 255],     # window
+],dtype=float)
+Sfcolor[:,:3]/=256 #RGBを0-1の範囲に変換
+Sfcmap=ListedColormap(Sfcolor)
+
+
+# from segmentron.utils.visualize import get_color_pallete
+# NAME_CLASSES = [
+#     # 'unknown',
+#     'beam', 'board', 'bookcase', 'ceiling', 'chair',
+#                 'clutter', 'column', 'door', 'floor', 'sofa',
+#                 'table', 'wall', 'window']
+
+
 from segmentron.utils.visualize import get_color_pallete
 NAME_CLASSES = [
-    # 'unknown',
-    'beam', 'board', 'bookcase', 'ceiling', 'chair',
-                'clutter', 'column', 'door', 'floor', 'sofa',
+    'ceiling', 'chair',
+                'door', 'floor', 'sofa',
                 'table', 'wall', 'window']
+
+
+
+
+
+
+
 
 def fast_hist(a, b, n):
     k = (a >= 0) & (a < n)
@@ -77,6 +133,29 @@ class Evaluator(object):
             if isinstance(m[1], nn.BatchNorm2d) or isinstance(m[1], nn.SyncBatchNorm):
                 setattr(m[1], attr, value)
 
+
+    def visualize_segmentation(self,image, output, target, filename, save_dir="results_sii_8class_raw_dkan_2025-08-08-18-23-13"):
+        os.makedirs(save_dir, exist_ok=True)
+
+        # 画像をCPUに戻してNumPy配列に変換
+        image = image.cpu().numpy().transpose(1, 2, 0)  # (C, H, W) → (H, W, C)
+        image = image - image.min()  # 負の値を 0 以上にする
+        image = image / image.max()  # 最大値を 1 に正規化
+
+        output = output.argmax(0).cpu().numpy()  # モデルの予測結果 (H, W)
+        target = target.cpu().numpy()  # ground truth (H, W )
+
+        plt.imshow(output, cmap=Sfcmap, alpha=1.0, vmin=0, vmax=7, interpolation='none')
+        plt.axis("off")
+
+
+        base_filename = os.path.basename(filename)
+        save_path = os.path.join(save_dir, f"{base_filename}")
+        plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
+        plt.close()
+
+
+
     def eval(self):
         logging.info("Target eval.")
         self._eval(self.val_loader)
@@ -97,14 +176,26 @@ class Evaluator(object):
             image = image.to(self.device)
             target = target.to(self.device)
 
+             
+            # Start timing
+            start_time = time.perf_counter()#計測開始
+
             with torch.no_grad():
                 output = model.evaluate(image)
 
-            self.metric.update(output, target)
-            pixAcc, mIoU = self.metric.get()
-            if i % 10 == 0:
-                logging.info("Sample: {:d}, validation pixAcc: {:.3f}, mIoU: {:.3f}".format(
-                    i + 1, pixAcc * 100, mIoU * 100))
+            # End timing
+            end_time = time.perf_counter() #計測終了
+            # Calculate and print processing time
+            processing_time = (end_time - start_time)*1000
+            print(f"Processing time for {filename}: {processing_time:.6f} ms ")
+            
+            self.visualize_segmentation(image[0].cpu(), output[0].cpu(), target[0].cpu(), filename[0])
+
+            # self.metric.update(output, target)
+            # pixAcc, mIoU = self.metric.get()
+            # if i % 10 == 0:
+            #     logging.info("Sample: {:d}, validation pixAcc: {:.3f}, mIoU: {:.3f}".format(
+            #         i + 1, pixAcc * 100, mIoU * 100))
 
         synchronize()
         pixAcc, mIoU, category_iou = self.metric.get(return_category_iou=True)
