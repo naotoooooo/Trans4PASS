@@ -15,11 +15,13 @@ class DensePASSSegmentation(SegmentationDataset):
     """DensePASS Semantic Segmentation Dataset."""
     NUM_CLASS = 19
 
-    def __init__(self, root='datasets/DensePASS', split='val', mode=None, transform=None, **kwargs):
+    # def __init__(self, root='datasets/DensePASS', split='val', mode=None, transform=None, **kwargs):
+    def __init__(self, root='datasets/raw_outdoor_sii_2025-08-15-11-58-23', split='val', mode=None, transform=None, **kwargs):
+        
         super(DensePASSSegmentation, self).__init__(root, split, mode, transform, **kwargs)
-        assert os.path.exists(self.root), "Please put dataset in {SEG_ROOT}/datasets/DensePASS"
+        assert os.path.exists(self.root), "Please put dataset in {SEG_ROOT}datasets/raw_outdoor_sii_2025-08-15-11-58-23"
         self.images, self.mask_paths = _get_city_pairs(self.root, self.split)
-        self.crop_size = [400, 2048]  # for inference only
+        self.crop_size = [331, 1280]  # for inference only
         assert (len(self.images) == len(self.mask_paths))
         if len(self.images) == 0:
             raise RuntimeError("Found 0 images in subfolders of:" + root + "\n")
@@ -100,7 +102,8 @@ def _get_city_pairs(folder, split='train'):
                     foldername = os.path.basename(os.path.dirname(imgpath))
                     # maskname = filename.replace('_.png', '_labelTrainIds.png')
                     maskname = filename.replace('.png', '_labelTrainIds.png')
-                    maskpath = os.path.join(mask_folder, foldername, maskname)
+                    maskpath = os.path.join(mask_folder, filename)
+                    #maskpath = os.path.join(mask_folder, foldername, maskname)
                     if os.path.isfile(imgpath) and os.path.isfile(maskpath):
                         img_paths.append(imgpath)
                         mask_paths.append(maskpath)
@@ -110,15 +113,15 @@ def _get_city_pairs(folder, split='train'):
         return img_paths, mask_paths
 
     if split in ('train', 'val'):
-        img_folder = os.path.join(folder, 'leftImg8bit/' + split)
-        mask_folder = os.path.join(folder, 'gtFine/' + split)
+        img_folder = os.path.join(folder, 'rgb/' + split)
+        mask_folder = os.path.join(folder, 'depth/' + split)
         img_paths, mask_paths = get_path_pairs(img_folder, mask_folder)
         return img_paths, mask_paths
     else:
         assert split == 'test'
         logging.info('test set, but only val set')
-        val_img_folder = os.path.join(folder, 'leftImg8bit/val')
-        val_mask_folder = os.path.join(folder, 'gtFine/val')
+        val_img_folder = os.path.join(folder, 'rgb/val')
+        val_mask_folder = os.path.join(folder, 'depth/val')
         img_paths, mask_paths = get_path_pairs(val_img_folder, val_mask_folder)
       
     return img_paths, mask_paths

@@ -14,6 +14,7 @@ TRAIN:
 TEST:
     BATCH_SIZE: 1
     TEST_MODEL_PATH: "workdirs/cityscapes/trans4pass_plus_small_512x512/trans4pass_plus_small_512x512.pth"
+    # TEST_MODEL_PATH: "/home/user/ws/src/Trans4PASS/adaptations/snapshots/CS2outdoor_8noji_domaindata_Trans4PASS_plus_v1_MPA/iter_1000.pth"
     CROP_SIZE: (512, 512)
 
 SOLVER:

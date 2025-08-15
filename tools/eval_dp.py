@@ -98,7 +98,7 @@ class Evaluator(object):
             if isinstance(m[1], nn.BatchNorm2d) or isinstance(m[1], nn.SyncBatchNorm):
                 setattr(m[1], attr, value)
 
-    def visualize_segmentation(self,image, output, target, filename, save_dir="results_8noji_test"):
+    def visualize_segmentation(self,image, output, target, filename, save_dir="results_ros_test"):
         os.makedirs(save_dir, exist_ok=True)
 
         # 画像をCPUに戻してNumPy配列に変換
@@ -152,7 +152,7 @@ class Evaluator(object):
         
         
         
-        
+        processing_times = []  # ログに出力した画像だけの時間を保存 
         
         for i, (image, target, filename) in enumerate(self.val_loader):
             image = image.to(self.device)
@@ -168,7 +168,9 @@ class Evaluator(object):
             end_time = time.perf_counter() #計測終了
             # Calculate and print processing time
             processing_time = (end_time - start_time)*1000
-            print(f"Processing time for {filename}: {processing_time:.6f} ms ")
+            # print(f"Processing time for {filename}: {processing_time:.6f} ms ")
+            if i != 0:  # 最初の画像はスキップ
+                processing_times.append(processing_time)
             
             # self.metric.update(output, target)
             # pixAcc, mIoU = self.metric.get()
@@ -196,6 +198,12 @@ class Evaluator(object):
         # logging.info('Category iou: \n {}'.format(tabulate(table, headers, tablefmt='grid', showindex="always",
         #                                                    numalign='center', stralign='center')))
 
+        # 平均処理時間（ログ出力された分だけ）
+        print(f"Number of images processed: {len(processing_times)}")
+        print(f"Average processing time (logged only): {sum(processing_times)/len(processing_times):.6f} ms")
+ 
+   
+    
 
 if __name__ == '__main__':
     args = parse_args()
