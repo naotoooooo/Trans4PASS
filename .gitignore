@@ -1,4 +1,16 @@
+# */__pycache__/*
+# *.pyc
+# *.pth
+# .idea/*
+# .vscode/*
+# datasets
+# pretrained
+# workdirs
+# build/*
+# segmentron*
+# *.png
 */__pycache__/*
+*.png
 *.pyc
 *.pth
 .idea/*
@@ -8,3 +20,11 @@ pretrained
 workdirs
 build/*
 segmentron*
+
+##追加
+bev_test
+results
+adaptations/pseudo_outdoor_8noji_domaindata_Trans4PASS_plus_v1_ms
+snapshots
+adaptations/dataset/8noji_list
+birds_eye_outputs
