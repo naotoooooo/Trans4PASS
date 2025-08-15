@@ -2,6 +2,8 @@ import os
 import os.path as osp
 import numpy as np
 import random
+import matplotlib
+matplotlib.use('Agg')   # “Anti-Ghost” backend: no windows
 import matplotlib.pyplot as plt
 import collections
 import torch
@@ -25,7 +27,7 @@ class CSSrcDataSet(data.Dataset):
 
         for name in self.img_ids:
             img_file = osp.join(self.root, "leftImg8bit/%s/%s" % (self.set, name))
-            lbname = name.replace("leftImg8bit", "gtFine_labelTrainIds")
+            lbname = name.replace("leftImg8bit", "gtFine_labelIds")
             label_file = osp.join(self.root, "gtFine/%s/%s" % (self.set, lbname))
             self.files.append({
                 "img": img_file,
@@ -54,7 +56,29 @@ class CSSrcDataSet(data.Dataset):
         ])
         image = input_transform(image)
 
-        label = torch.LongTensor(np.array(label).astype('int32'))
+        # label = torch.LongTensor(np.array(label).astype('int32'))
+        
+        # 2) pull out raw IDs
+        label_np = np.array(label).astype(np.int32)
+
+        # 3) map those 0–33 IDs → 0–18 (or 255) trainIDs
+        ID_TO_TRAINID = {
+            0:255,1:255,2:255,3:255,4:255,5:255,6:255,
+            7:0,8:1,9:255,10:255,11:2,12:3,13:4,
+            14:255,15:255,16:255,17:5,18:255,19:6,
+            20:7,21:8,22:9,23:10,24:11,25:12,
+            26:13,27:14,28:15,29:255,30:255,31:16,
+            32:17,33:18
+        }
+        train_label = 255 * np.ones_like(label_np, dtype=np.uint8)
+        for orig_id, train_id in ID_TO_TRAINID.items():
+            train_label[label_np == orig_id] = train_id
+
+        # 4) back to tensor
+        label = torch.from_numpy(train_label).long()
+        
+        
+        
         return image, label, np.array(size), name
 
 
