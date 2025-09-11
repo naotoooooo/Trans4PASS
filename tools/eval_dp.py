@@ -98,7 +98,7 @@ class Evaluator(object):
             if isinstance(m[1], nn.BatchNorm2d) or isinstance(m[1], nn.SyncBatchNorm):
                 setattr(m[1], attr, value)
 
-    def visualize_segmentation(self,image, output, target, filename, save_dir="results_8noji_test"):
+    def visualize_segmentation(self,image, output, target, filename, save_dir="aaaaaaaaaaaa"):
         os.makedirs(save_dir, exist_ok=True)
 
         # 画像をCPUに戻してNumPy配列に変換
@@ -156,7 +156,8 @@ class Evaluator(object):
         
         for i, (image, target, filename) in enumerate(self.val_loader):
             image = image.to(self.device)
-            target = target.to(self.device)
+            if target.numel() > 0:   # マスクが空でなければ
+                target = target.to(self.device)
             
             # Start timing
             start_time = time.perf_counter()#計測開始
