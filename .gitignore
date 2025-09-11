@@ -20,6 +20,7 @@ pretrained
 workdirs
 build/*
 segmentron*
+GSSlam2*
 
 ##追加
 bev_test
