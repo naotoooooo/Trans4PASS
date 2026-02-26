@@ -29,3 +29,5 @@ adaptations/pseudo_outdoor_8noji_domaindata_Trans4PASS_plus_v1_ms
 snapshots
 adaptations/dataset/8noji_list
 birds_eye_outputs
+
+bagfile/*
