@@ -94,7 +94,7 @@ def birds_eye_equirectangular_corrected(equi_img,
     
 
     # 出力鳥瞰ビュー画像
-    birds_eye = cv2.remap(equi_img, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+    birds_eye = cv2.remap(equi_img, map_x, map_y, interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
     # birds_eye = cv2.flip(birds_eye, 1)  # 水平方向（左右）を反転
 
     
@@ -106,7 +106,7 @@ def birds_eye_equirectangular_corrected(equi_img,
 
 # img = cv2.imread("results_8noji_test/1740579295.965225.png_seg_only.png")
 # img = cv2.imread("results_8noji_test/1740578825.992192.png_seg_only.png")
-img = cv2.imread("datasets/outdoor_8noji_image_raw_2025-02-26-14-06-25/rgb/val/1740578825.992192.png")
+img = cv2.imread("seg_results/1758266821033450000.png_seg_only.png")
 # img = cv2.imread("datasets/outdoor_8noji_image_raw_2025-02-26-14-06-25/rgb/val/1740579295.965225.png")
 # img = cv2.imread("results_8noji_test/1740579289.186688.png_seg_only.png")
 
