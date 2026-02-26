@@ -16,10 +16,10 @@ class DensePASSSegmentation(SegmentationDataset):
     NUM_CLASS = 19
 
     # def __init__(self, root='datasets/DensePASS', split='val', mode=None, transform=None, **kwargs):
-    def __init__(self, root='datasets/raw_outdoor_sii_2025-08-15-11-58-23', split='val', mode=None, transform=None, **kwargs):
+    def __init__(self, root='input', split='val', mode=None, transform=None, **kwargs):
         
         super(DensePASSSegmentation, self).__init__(root, split, mode, transform, **kwargs)
-        assert os.path.exists(self.root), "Please put dataset in {SEG_ROOT}datasets/raw_outdoor_sii_2025-08-15-11-58-23"
+        assert os.path.exists(self.root), "Please put dataset in {SEG_ROOT}input"
         self.images, self.mask_paths = _get_city_pairs(self.root, self.split)
         self.crop_size = [331, 1280]  # for inference only
         assert (len(self.images) == len(self.mask_paths))
