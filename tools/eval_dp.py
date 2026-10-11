@@ -6,6 +6,10 @@ import sys
 import time
 import logging
 
+cur_path = os.path.abspath(os.path.dirname(__file__))
+root_path = os.path.split(cur_path)[0]
+sys.path.append(root_path)
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -120,18 +124,16 @@ class Evaluator(object):
         self.args = args
         self.device = torch.device(args.device)
 
-        # image transform
-        input_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(cfg.DATASET.MEAN, cfg.DATASET.STD),
-        ])
+        # 正規化は GPU 上で行う（Dataset からは HWC uint8 のテンソルを受け取る）
+        self.mean = torch.tensor(cfg.DATASET.MEAN, device=self.device).view(1, 3, 1, 1)
+        self.std = torch.tensor(cfg.DATASET.STD, device=self.device).view(1, 3, 1, 1)
 
         # ===== Live ROS2 Dataset & DataLoader =====
         self.val_dataset = LiveROS2SegmentationDataset(
-            img_topic='/equirectangular/image/compressed',   # ★ここを実トピックに合わせて変更
+            img_topic='/equirectangular/image_15hz',   # ★ここを実トピックに合わせて変更（生画像 sensor_msgs/Image）
             mask_topic=None,                # GT を配信しているならトピック名を指定
             crop_size=(331, 1280),
-            transform=input_transform
+            transform=torch.from_numpy      # HWC uint8 ndarray -> HWC uint8 tensor
         )
         # IterableDataset なので batch_sampler は使わない。ROS2 のため num_workers=0 固定
         self.val_loader = data.DataLoader(
@@ -253,34 +255,27 @@ class Evaluator(object):
                 # stamp: builtin_interfaces.msg.Time
                 # frame_id: str
 
-                # ここから下は少しだけ調整
-                image = image.unsqueeze(0).to(self.device)  # [1,C,H,W] にする
-                has_target = (isinstance(target, torch.Tensor) and target.numel() > 0)
-                if has_target:
-                    target = target.unsqueeze(0).to(self.device)  # [1,H,W] に揃える
+                # HWC uint8 -> GPU 上で [1,C,H,W] float に変換して正規化
+                image = image.to(self.device, non_blocking=True)
+                image = image.permute(2, 0, 1).unsqueeze(0).float().div_(255.0)
+                image = (image - self.mean) / self.std
 
                 # 推論
+                # scale=1.0 / flip なしなら evaluate() と同じ結果なので forward を直接呼ぶ
+                # （TEST.SCALES / TEST.FLIP を変える場合は model.evaluate(image) に戻す）
+                torch.cuda.synchronize()
                 t0 = time.perf_counter()
                 with torch.no_grad():
-                    output = model.evaluate(image)  # [B,C,H,W] = [1,C,H,W]
+                    output = model(image)[0]  # [1,C,H,W]
+                    # argmax は GPU で行い、uint8 の 1ch だけ CPU に転送
+                    pred = output[0].argmax(0).to(torch.uint8).cpu().numpy()
                 dt_ms = (time.perf_counter() - t0) * 1000.0
                 print(f"Processing time: {dt_ms:.3f} ms")
 
-                out_b = output[0].cpu()  # [C,H,W]
-                pred = out_b.argmax(0).numpy().astype(np.uint8)
                 color = colorize_trainid(pred)
 
-                tgt0 = (target[0].cpu() if has_target
-                        else torch.zeros_like(torch.from_numpy(pred), dtype=torch.long))
-
-                # 可視化用ファイル名（stamp から ns）
-                try:
-                    stamp_ns = stamp.sec * 1_000_000_000 + stamp.nanosec
-                    name0 = f"{stamp_ns}"
-                except Exception:
-                    name0 = f"frame_{i:06d}"
-
-                self.visualize_segmentation(image[0].cpu(), out_b, tgt0, name0)
+                # PNG 保存は重いので無効化（必要なときだけ有効にする）
+                # self.visualize_segmentation(image[0].cpu(), output[0].cpu(), None, f"frame_{i:06d}")
 
                 # 元画像の stamp / frame_id をそのまま使って publish
                 seg_pub.publish_color(color, stamp=stamp, frame_id=frame_id)
@@ -310,6 +305,7 @@ if __name__ == '__main__':
     cfg.check_and_freeze()
 
     default_setup(args)
+    torch.backends.cudnn.benchmark = False
 
     evaluator = Evaluator(args)
     evaluator.eval()

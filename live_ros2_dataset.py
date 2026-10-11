@@ -6,6 +6,7 @@ import time
 from collections import deque
 from typing import Optional, Tuple
 
+import cv2
 import numpy as np
 import torch
 from torch.utils.data import IterableDataset
@@ -21,8 +22,6 @@ from sensor_msgs.msg import Image as RosImage
 from sensor_msgs.msg import CompressedImage as RosCompressedImage
 from builtin_interfaces.msg import Time
 from cv_bridge import CvBridge
-
-from PIL import Image
 
 
 class _ImageBufferNode(Node):
@@ -65,8 +64,8 @@ class _ImageBufferNode(Node):
 
         # Image subscriber(s)
         # Note: it's safe to subscribe to both raw and compressed; whichever publishes will feed the buffer.
-        # self._img_sub_raw = self.create_subscription(RosImage, img_topic, self._cb_image, qos)
-        self._img_sub_cmp = self.create_subscription(RosCompressedImage, img_topic, self._cb_compressed, qos)
+        self._img_sub_raw = self.create_subscription(RosImage, img_topic, self._cb_image, qos)
+        # self._img_sub_cmp = self.create_subscription(RosCompressedImage, img_topic, self._cb_compressed, qos)
         if mask_topic:
             self._msk_sub_raw = self.create_subscription(RosImage, mask_topic, self._cb_mask_image, qos)
             self._msk_sub_cmp = self.create_subscription(RosCompressedImage, mask_topic, self._cb_mask_compressed, qos)
@@ -74,7 +73,8 @@ class _ImageBufferNode(Node):
     # --- Image callbacks ---
     def _cb_image(self, msg: RosImage):
         try:
-            cv = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            # 圧縮画像のデコード結果と揃えて BGR にする（rgb8 で来ても後段の BGR->RGB が正しく効く）
+            cv = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             stamp_msg: Time = msg.header.stamp
             frame_id: str = msg.header.frame_id
             with self.lock:
@@ -278,14 +278,11 @@ class LiveROS2SegmentationDataset(IterableDataset):
                 lm = self.node.latest_mask()
                 mk_np = None if lm is None else lm[0]
 
-                # BGR->RGB
+                # BGR->RGB（ビューなのでここではコピーしない。crop 後に連続化する）
                 if self.to_rgb and im_np.ndim == 3 and im_np.shape[2] == 3:
                     im_np = im_np[:, :, ::-1]
-                # PIL for downstream transforms
-                pil_img = Image.fromarray(im_np) if im_np.ndim == 2 else Image.fromarray(im_np)
-                pil_msk = None if mk_np is None else Image.fromarray(mk_np.astype(np.int32), mode='I')
 
-                img_t, msk_t = self._apply_transforms(pil_img, pil_msk)
+                img_t, msk_t = self._apply_transforms(im_np, mk_np)
 
                 # stamp_ns はログや可視化で使いたければここで作る
                 # stamp_ns = stamp_msg.sec * 10**9 + stamp_msg.nanosec
@@ -301,38 +298,38 @@ class LiveROS2SegmentationDataset(IterableDataset):
                 time.sleep(0.01)
 
     # --- same spirit as your _val_sync_transform_resize/_mask_transform ---
-    def _apply_transforms(self, pil_img: Image.Image, pil_msk: Optional[Image.Image]):
+    def _apply_transforms(self, im_np: np.ndarray, mk_np: Optional[np.ndarray]):
+        # PIL を経由せず numpy のまま処理する（crop はスライスなのでコピーなし）
         # ensure crop if needed
-        w, h = pil_img.size
+        h, w = im_np.shape[:2]
         cw, ch = self.crop_w, self.crop_h
         if w < cw or h < ch:
-            pil_img = pil_img.resize((max(w, cw), max(h, ch)), Image.BILINEAR)
-            if pil_msk is not None:
-                pil_msk = pil_msk.resize((max(w, cw), max(h, ch)), Image.NEAREST)
-            w, h = pil_img.size
+            size = (max(w, cw), max(h, ch))
+            im_np = cv2.resize(np.ascontiguousarray(im_np), size, interpolation=cv2.INTER_LINEAR)
+            if mk_np is not None:
+                mk_np = cv2.resize(mk_np.astype(np.int32), size, interpolation=cv2.INTER_NEAREST)
+            h, w = im_np.shape[:2]
         # center-crop
         x1 = max(0, (w - cw) // 2)
         y1 = max(0, (h - ch) // 2)
-        pil_img = pil_img.crop((x1, y1, x1 + cw, y1 + ch))
-        if pil_msk is not None:
-            pil_msk = pil_msk.crop((x1, y1, x1 + cw, y1 + ch))
+        im_np = np.ascontiguousarray(im_np[y1:y1 + ch, x1:x1 + cw])
+        if mk_np is not None:
+            mk_np = mk_np[y1:y1 + ch, x1:x1 + cw]
 
-        # optional external transforms (e.g., torchvision)
+        # optional external transforms (HWC uint8 ndarray を受け取る)
         if self.transform is not None:
-            img_t = self.transform(pil_img)
+            img_t = self.transform(im_np)
         else:
-            img_t = self._default_img_transform(pil_img)
+            img_t = self._default_img_transform(im_np)
 
-        if pil_msk is None:
+        if mk_np is None:
             msk_t = None
         else:
-            msk_np = np.array(pil_msk).astype('int32')
-            msk_t = torch.LongTensor(msk_np)
+            msk_t = torch.from_numpy(mk_np.astype(np.int64))
         return img_t, msk_t
 
-    def _default_img_transform(self, pil_img: Image.Image) -> torch.Tensor:
+    def _default_img_transform(self, np_img: np.ndarray) -> torch.Tensor:
         # Minimal default: HWC uint8 -> CHW float in [0,1]
-        np_img = np.array(pil_img)
         if np_img.ndim == 2:
             np_img = np.expand_dims(np_img, axis=-1)
         np_img = np.transpose(np_img, (2, 0, 1)).astype(np.float32) / 255.0
