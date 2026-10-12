@@ -4,6 +4,7 @@ from __future__ import print_function
 import os
 import sys
 import time
+import array
 import logging
 
 cur_path = os.path.abspath(os.path.dirname(__file__))
@@ -32,6 +33,8 @@ import rclpy
 from rclpy.node import Node
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image as RosImage
+from sensor_msgs.msg import CompressedImage as RosCompressedImage
+import cv2
 
 # 可視化
 import matplotlib
@@ -87,11 +90,16 @@ def colorize_trainid(train_id_map: np.ndarray) -> np.ndarray:
 
 
 class SegPublisher(Node):
-    """推論結果（カラーのみ）を配信する ROS2 ノード"""
-    def __init__(self, color_topic='/segmentation/color'):
+    """推論結果（カラーのみ）を配信する ROS2 ノード
+       - color_topic            : sensor_msgs/Image (bgr8)
+       - color_topic/compressed : sensor_msgs/CompressedImage (PNG, 可逆。クラス境界の色がにじまない)
+    """
+    def __init__(self, color_topic='/segmentation/color', png_level=1):
         super().__init__('segmentation_publisher')
         self.bridge = CvBridge()
+        self.png_level = png_level  # 0-9: 大きいほど小さくなるが遅い
         self.pub_color = self.create_publisher(RosImage, color_topic, 1)
+        self.pub_color_cmp = self.create_publisher(RosCompressedImage, color_topic + '/compressed', 1)
 
     def publish_color(self, color_rgb_np: np.ndarray,
                       stamp=None,
@@ -102,7 +110,8 @@ class SegPublisher(Node):
         frame_id: str or None
         """
         # RViz2 互換の bgr8 で配信
-        msg_color = self.bridge.cv2_to_imgmsg(color_rgb_np[:, :, ::-1].copy(), encoding='bgr8')
+        color_bgr = np.ascontiguousarray(color_rgb_np[:, :, ::-1])
+        msg_color = self.bridge.cv2_to_imgmsg(color_bgr, encoding='bgr8')
 
         # タイムスタンプを元画像に合わせる
         if stamp is not None:
@@ -117,6 +126,17 @@ class SegPublisher(Node):
             msg_color.header.frame_id = 'camera'
 
         self.pub_color.publish(msg_color)
+
+        # 圧縮画像: PNG エンコードは CPU を使うので、購読者（rosbag record など）がいるときだけ
+        if self.pub_color_cmp.get_subscription_count() > 0:
+            ok, png = cv2.imencode('.png', color_bgr, [cv2.IMWRITE_PNG_COMPRESSION, self.png_level])
+            if ok:
+                msg_cmp = RosCompressedImage()
+                msg_cmp.header = msg_color.header
+                msg_cmp.format = 'bgr8; png compressed bgr8'  # image_transport compressed と同じ形式
+                # array.array で渡すと Humble の要素ごとの型チェックを回避できる（bytes だと遅い）
+                msg_cmp.data = array.array('B', png.tobytes())
+                self.pub_color_cmp.publish(msg_cmp)
 
 
 class Evaluator(object):
