@@ -64,8 +64,8 @@ class _ImageBufferNode(Node):
 
         # Image subscriber(s)
         # Note: it's safe to subscribe to both raw and compressed; whichever publishes will feed the buffer.
-        self._img_sub_raw = self.create_subscription(RosImage, img_topic, self._cb_image, qos)
-        # self._img_sub_cmp = self.create_subscription(RosCompressedImage, img_topic, self._cb_compressed, qos)
+        # self._img_sub_raw = self.create_subscription(RosImage, img_topic, self._cb_image, qos)
+        self._img_sub_cmp = self.create_subscription(RosCompressedImage, img_topic, self._cb_compressed, qos)
         if mask_topic:
             self._msk_sub_raw = self.create_subscription(RosImage, mask_topic, self._cb_mask_image, qos)
             self._msk_sub_cmp = self.create_subscription(RosCompressedImage, mask_topic, self._cb_mask_compressed, qos)

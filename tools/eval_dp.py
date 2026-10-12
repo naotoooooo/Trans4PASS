@@ -130,7 +130,7 @@ class Evaluator(object):
 
         # ===== Live ROS2 Dataset & DataLoader =====
         self.val_dataset = LiveROS2SegmentationDataset(
-            img_topic='/equirectangular/image_15hz',   # ★ここを実トピックに合わせて変更（生画像 sensor_msgs/Image）
+            img_topic='/equirectangular/image/compressed',   # ★ここを実トピックに合わせて変更（圧縮画像 sensor_msgs/CompressedImage）
             mask_topic=None,                # GT を配信しているならトピック名を指定
             crop_size=(331, 1280),
             transform=torch.from_numpy      # HWC uint8 ndarray -> HWC uint8 tensor
